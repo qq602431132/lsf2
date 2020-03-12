@@ -89,7 +89,7 @@ public class SimpleWebServer extends NanoHTTPD {
 
 	NanoFileUpload nanoFileUploader;
 	private final static String sepa = File.separator;
-	boolean isDelFlag = false;// false※关闭 true※开启
+//	boolean isDelFlag;// false※关闭 true※开启
 	private final static String DELETE = "delete";
 	private final static String IFDEL = "ifDel";
 	private final static String GETMD5 = "getMD5";
@@ -411,7 +411,7 @@ public class SimpleWebServer extends NanoHTTPD {
 		msg.append("</script>");
 	}
 
-	protected String listDirectory(String uri, File f) throws IOException {
+	protected String listDirectory(IHTTPSession session,String uri, File f) throws IOException {
 		String heading = "Directory " + uri;
 		StringBuilder msg = new StringBuilder(
 				"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">"
@@ -437,6 +437,7 @@ public class SimpleWebServer extends NanoHTTPD {
 		msg.append("</form></td>");
 		msg.append("<td><form name=\"szifdel\" method=\"get\">");
 		msg.append("<input type=\"hidden\" name=\"" + IFDEL + "\" value=\"" + randomASkr() + "\" ></input>");
+		boolean isDelFlag =Boolean.parseBoolean(session.getHeaders().get(IFDEL));
 		String isDelstr = (isDelFlag) ? "关闭删除" + "</button><font color=\"red\">删除功能已开启，请谨慎操作！！！</font>"
 				: "开启删除" + "</button>";
 		msg.append("<button name=\"btn_kgdel\" type=\"submit\" >" + isDelstr + "</button>");
@@ -568,7 +569,6 @@ public class SimpleWebServer extends NanoHTTPD {
 
 	public static Response addRangesHeaders(IStatus status, String mimeType, String message) {
 		Response response = NanoHTTPD.newFixedLengthResponse(status, mimeType, message);
-
 		response.addHeader("Accept-Ranges", "bytes");
 		return response;
 	}
@@ -588,6 +588,7 @@ public class SimpleWebServer extends NanoHTTPD {
 		if (cors != null) {
 			r = addCORSHeaders(headers, r, cors);
 		}
+		session.getCookies().unloadQueue(r);
 		return r;
 	}
 
@@ -631,7 +632,7 @@ public class SimpleWebServer extends NanoHTTPD {
 			if (indexFile == null) {
 				if (f.canRead()) {
 					// No index file, list the directory if it is readable
-					return addRangesHeaders(Status.OK, NanoHTTPD.MIME_HTML, listDirectory(uri, f));
+					return addRangesHeaders(Status.OK, NanoHTTPD.MIME_HTML, listDirectory(session,uri, f));
 				} else {
 					return render403("No directory listing.");
 				}
@@ -657,9 +658,18 @@ public class SimpleWebServer extends NanoHTTPD {
 	// 入口
 	@Override
 	public Response serve(IHTTPSession session) {
-
 		Map<String, String> header = session.getHeaders();
 		Map<String, String> parms = session.getParms();
+		CookieHandler cookies = session.getCookies();
+		String read = cookies.read(IFDEL);
+		System.out.println("IFDEL="+read);
+		if("".equals(read)) {
+			//第一次请求
+			cookies.set(IFDEL, "false", 1);
+			header.put(IFDEL, false+"");
+		}else {
+			header.put(IFDEL, read);
+		}
 		String uri = session.getUri();
 		LOG.info(randomASkr() + "请求uri:" + uri + ",请求参数:" + parms.keySet());
 		try {
@@ -730,6 +740,7 @@ public class SimpleWebServer extends NanoHTTPD {
 				LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 				return doshowFile(session);
 			}
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 			return doshowFile(session);
@@ -743,7 +754,12 @@ public class SimpleWebServer extends NanoHTTPD {
 	}
 
 	private Response deal_ifdel(IHTTPSession session, Map<String, String> parms) {
+		CookieHandler cookies = session.getCookies();
+		boolean isDelFlag =Boolean.parseBoolean(cookies.read(IFDEL));
 		isDelFlag = !isDelFlag;
+		System.out.println("替换为:"+isDelFlag);
+		cookies.set(IFDEL, ""+isDelFlag, 1);
+		session.getHeaders().put(IFDEL, ""+isDelFlag+"");
 		return doshowFile(session);
 	}
 
@@ -877,6 +893,7 @@ public class SimpleWebServer extends NanoHTTPD {
 		String delFileName = parms.get(DELETE);
 		File reqFile = new File(FilenameUtils.normalize(homeDir.getCanonicalPath() + session.getUri()));
 		File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + delFileName));
+		boolean isDelFlag =Boolean.parseBoolean(session.getHeaders().get(IFDEL));
 		if (isDelFlag) {
 			FileUtils.deleteQuietly(tgFile);
 			return doshowFile(session);
