@@ -64,6 +64,8 @@ import java.util.logging.Logger;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
 import org.apache.commons.fileupload.FileUploadException;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.util.Streams;
@@ -429,7 +431,7 @@ public class SimpleWebServer extends NanoHTTPD {
 		msg.append(
 				"<td><input name=\"bt_fh\" type=\"button\" value=\"返回\" onclick=\"javascript:history.back();\" /></td>");
 		msg.append("<td><form enctype=\"multipart/form-data\" name=\"fileul\" method=\"post\">");
-		msg.append("<input name=\"file\" type=\"file\"/>");
+		msg.append("<input name=\"file\" type=\"file\" multiple=\"multiple\" />");
 		msg.append("<input name=\"btn_sc\" type=\"submit\" value=\"上传\"/>");
 		msg.append("</form></td>");
 		msg.append("<td><form name=\"xjwjj\" method=\"get\">");
@@ -686,28 +688,27 @@ public class SimpleWebServer extends NanoHTTPD {
 			}
 			File reqFile = new File(FilenameUtils.normalize(homeDir.getCanonicalPath() + session.getUri()));
 			LOG.info(randomASkr() + "reqFile" + reqFile.toPath());
-			if (session.getMethod() == Method.POST && NanoFileUpload.isMultipartContent(session)) { // 处理POST请求
+			if (session.getMethod() == Method.POST && NanoFileUpload.isMultipartContent(session)) {
 				List<FileItem> parseRequest = nanoFileUploader.parseRequest(session);
-				FileItem fileItem = parseRequest.get(0);
-				String fname = FilenameUtils.getName(fileItem.getName());
-				File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + fname));
-				LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
-				if ("".equals(fname)) {
-					return doshowFile(session);
-				} else {
-					InputStream is = fileItem.getInputStream();
-					while (tgFile.exists()) {
-						tgFile = new File(FilenameUtils
-								.normalize(reqFile.getAbsolutePath() + "" + sepa + "_" + tgFile.getName()));
-						LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
+				for (FileItem fileItem : parseRequest) {
+					String fname = FilenameUtils.getName(fileItem.getName());
+					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + fname));
+					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
+					if (!"".equals(fname)) {
+						InputStream is = fileItem.getInputStream();
+						while (tgFile.exists()) {
+							tgFile = new File(FilenameUtils
+									.normalize(reqFile.getAbsolutePath() + "" + sepa + "_" + tgFile.getName()));
+							LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
+						}
+						FileOutputStream os = FileUtils.openOutputStream(tgFile, false);
+						Streams.copy(is, os, true);
+						is.close();
+						os.flush();
+						os.close();
 					}
-					FileOutputStream os = FileUtils.openOutputStream(tgFile, false);
-					Streams.copy(is, os, true);
-					is.close();
-					os.flush();
-					os.close();
-					return doshowFile(session);
 				}
+				return doshowFile(session);
 			} else if (session.getMethod() == Method.GET && parms.keySet().size() > 0) {// 处理GET
 				LOG.info(randomASkr() + parms);
 				if (parms.containsKey(DELETE)) {
