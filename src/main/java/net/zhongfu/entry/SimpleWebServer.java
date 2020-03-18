@@ -712,22 +712,22 @@ public class SimpleWebServer extends NanoHTTPD {
 			} else if (session.getMethod() == Method.GET && parms.keySet().size() > 0) {// 处理GET
 				LOG.info(randomASkr() + parms);
 				if (parms.containsKey(DELETE)) {
-					String delFileName = parms.get(DELETE);
+					String delFileName = parms.get(DELETE).trim();
 					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + delFileName));
 					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 					return deal_delFile(session, parms);
 				} else if (parms.containsKey(GETMD5)) {
-					String getMD5FileName = parms.get(GETMD5);
+					String getMD5FileName = parms.get(GETMD5).trim();
 					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + getMD5FileName));
 					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 					return deal_getMD5(session, parms);
 				} else if (parms.containsKey(DOCMD)) {
-					String doCMDFileName = parms.get(DOCMD);
+					String doCMDFileName = parms.get(DOCMD).trim();
 					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + doCMDFileName));
 					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 					return deal_docmd(session, parms);
 				} else if (parms.containsKey(MKDIR)) {
-					String mkDIRName = parms.get(MKDIR);
+					String mkDIRName = parms.get(MKDIR).trim();
 					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + mkDIRName));
 					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 					return deal_makeDir(session, parms);
@@ -762,7 +762,7 @@ public class SimpleWebServer extends NanoHTTPD {
 	}
 
 	private Response deal_makeDir(IHTTPSession session, Map<String, String> parms) {
-		String dirName = parms.get(MKDIR);
+		String dirName = parms.get(MKDIR).trim();
 		boolean canServeUri = false;
 		File homeDir = null;
 		for (int i = 0; !canServeUri && i < this.rootDirs.size(); i++) {
@@ -802,7 +802,7 @@ public class SimpleWebServer extends NanoHTTPD {
 			return render404();
 		}
 		List<String> cmds = new ArrayList<String>();
-		String cmdstr = parms.get(DOCMD);
+		String cmdstr = parms.get(DOCMD).trim();
 		if (IPUtil1.isWindowsOS()) {
 			cmds.add("cmd.exe");
 			cmds.add("/c");
@@ -811,7 +811,7 @@ public class SimpleWebServer extends NanoHTTPD {
 			cmds.add("-c");
 		}
 		cmds.add(cmdstr);
-		String cddir1 = parms.get(CDDIR);
+		String cddir1 = parms.get(CDDIR).trim();
 		if (!"".equals(cmdstr)) {
 			try {
 				String cddir = "".equals(cddir1)
