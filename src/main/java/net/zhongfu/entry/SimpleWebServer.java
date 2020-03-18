@@ -64,8 +64,6 @@ import java.util.logging.Logger;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.FileItemIterator;
-import org.apache.commons.fileupload.FileItemStream;
 import org.apache.commons.fileupload.FileUploadException;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.util.Streams;
@@ -227,7 +225,6 @@ public class SimpleWebServer extends NanoHTTPD {
 		try {
 			LOG.info(randomASkr() + "开始运行※访问地址※http://" + getIP() + ":" + port + "/");
 		} catch (Exception e) {
-			LOG.info(randomASkr() + "启动失败※" + e.getMessage());
 		}
 		ServiceLoader<WebServerPluginInfo> serviceLoader = ServiceLoader.load(WebServerPluginInfo.class);
 		for (WebServerPluginInfo info : serviceLoader) {
@@ -677,70 +674,25 @@ public class SimpleWebServer extends NanoHTTPD {
 			if (isDelFlagMap.get(session_Id) == null) {
 				isDelFlagMap.put(session_Id, false + "");
 			}
-			boolean canServeUri = false;
-			File homeDir = null;
-			for (int i = 0; !canServeUri && i < this.rootDirs.size(); i++) {
-				homeDir = this.rootDirs.get(i);
-				canServeUri = canServeUri(session.getUri(), homeDir);
-			}
-			if (!canServeUri) {
-				return render404();
-			}
-			File reqFile = new File(FilenameUtils.normalize(homeDir.getCanonicalPath() + session.getUri()));
-			LOG.info(randomASkr() + "reqFile" + reqFile.toPath());
+
 			if (session.getMethod() == Method.POST && NanoFileUpload.isMultipartContent(session)) {
-				List<FileItem> parseRequest = nanoFileUploader.parseRequest(session);
-				for (FileItem fileItem : parseRequest) {
-					String fname = FilenameUtils.getName(fileItem.getName());
-					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + fname));
-					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
-					if (!"".equals(fname)) {
-						InputStream is = fileItem.getInputStream();
-						while (tgFile.exists()) {
-							tgFile = new File(FilenameUtils
-									.normalize(reqFile.getAbsolutePath() + "" + sepa + "_" + tgFile.getName()));
-							LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
-						}
-						FileOutputStream os = FileUtils.openOutputStream(tgFile, false);
-						Streams.copy(is, os, true);
-						is.close();
-						os.flush();
-						os.close();
-					}
-				}
-				return doshowFile(session);
+				return deal_doFileUpload(session);
 			} else if (session.getMethod() == Method.GET && parms.keySet().size() > 0) {// 处理GET
 				LOG.info(randomASkr() + parms);
 				if (parms.containsKey(DELETE)) {
-					String delFileName = parms.get(DELETE).trim();
-					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + delFileName));
-					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 					return deal_delFile(session, parms);
 				} else if (parms.containsKey(GETMD5)) {
-					String getMD5FileName = parms.get(GETMD5).trim();
-					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + getMD5FileName));
-					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 					return deal_getMD5(session, parms);
 				} else if (parms.containsKey(DOCMD)) {
-					String doCMDFileName = parms.get(DOCMD).trim();
-					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + doCMDFileName));
-					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 					return deal_docmd(session, parms);
 				} else if (parms.containsKey(MKDIR)) {
-					String mkDIRName = parms.get(MKDIR).trim();
-					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + mkDIRName));
-					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 					return deal_makeDir(session, parms);
 				} else if (parms.containsKey(IFDEL)) {
 					return deal_ifdel(session, parms);
 				} else {
-					File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath()));
-					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 					return doshowFile(session);
 				}
 			} else {
-				File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath()));
-				LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
 				return doshowFile(session);
 			}
 		} catch (IOException e) {
@@ -753,6 +705,40 @@ public class SimpleWebServer extends NanoHTTPD {
 			e.printStackTrace();
 			return doshowFile(session);
 		}
+	}
+
+	private Response deal_doFileUpload(IHTTPSession session) throws FileUploadException, IOException {
+		boolean canServeUri = false;
+		File homeDir = null;
+		for (int i = 0; !canServeUri && i < this.rootDirs.size(); i++) {
+			homeDir = this.rootDirs.get(i);
+			canServeUri = canServeUri(session.getUri(), homeDir);
+		}
+		if (!canServeUri) {
+			return render404();
+		}
+		File reqFile = new File(FilenameUtils.normalize(homeDir.getCanonicalPath() + session.getUri()));
+		LOG.info(randomASkr() + "reqFile" + reqFile.toPath());
+		List<FileItem> parseRequest = nanoFileUploader.parseRequest(session);
+		for (FileItem fileItem : parseRequest) {
+			String fname = FilenameUtils.getName(fileItem.getName());
+			File tgFile = new File(FilenameUtils.normalize(reqFile.getAbsolutePath() + sepa + fname));
+			LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
+			if (!"".equals(fname)) {
+				InputStream is = fileItem.getInputStream();
+				while (tgFile.exists()) {
+					tgFile = new File(
+							FilenameUtils.normalize(reqFile.getAbsolutePath() + "" + sepa + "_" + tgFile.getName()));
+					LOG.info(randomASkr() + "tgFile:" + tgFile.toPath());
+				}
+				FileOutputStream os = FileUtils.openOutputStream(tgFile, false);
+				Streams.copy(is, os, true);
+				is.close();
+				os.flush();
+				os.close();
+			}
+		}
+		return doshowFile(session);
 	}
 
 	private Response deal_ifdel(IHTTPSession session, Map<String, String> parms) {
@@ -817,33 +803,18 @@ public class SimpleWebServer extends NanoHTTPD {
 				String cddir = "".equals(cddir1)
 						? FilenameUtils.normalize(homeDir.getCanonicalPath() + session.getUri())
 						: cddir1;
-				File reqFile = new File(FilenameUtils.normalize(homeDir.getCanonicalPath() + session.getUri()));
 				Result r = ProcessUtils.run(new File(cddir), cmds);
 				StringBuilder rlb = new StringBuilder();
-				if (r.code == 0) {
-					msg.append("<form name=\"zxcmdform\" method=\"get\">");
-					msg.append("<input type=\"text\" name=\"" + CDDIR + "\" value=\"" + cddir + "\" />");
-					msg.append("<input type=\"text\" name=\"" + DOCMD + "\" value=\"" + cmdstr + "\" />");
-					msg.append("<input type=\"submit\" name=\"btn_zxcmd\" value=\"执行CMD\" />  ");
-					msg.append("</form>");
-					for (String rl : r.data) {
-						rlb.append("<p><script type=\"text/html\" style='display:block'>").append(rl.trim())
-								.append("</script>");
-					}
-					return render200(msg.toString() + "执行返回code※" + r.code + "<p>" + rlb.toString() + "</body></html>");
-				} else {
-					msg.append("<form name=\"zxcmdform\" method=\"get\">");
-					msg.append("<input type=\"text\" name=\"" + CDDIR + "\" value=\"" + cddir + "\" />");
-					msg.append("<input type=\"text\" name=\"" + DOCMD + "\" value=\"" + cmdstr + "\" />");
-					msg.append("<input type=\"submit\" name=\"btn_zxcmd\" value=\"执行CMD\" />  ");
-					msg.append("</form>");
-					for (String rl : r.data) {
-						rlb.append("<p><script type=\"text/html\" style='display:block'>").append(rl.trim())
-								.append("</script>");
-					}
-					return render200(
-							msg.toString() + "执行命令失败code※" + r.code + "<p>" + rlb.toString() + "</body></html>");
+				msg.append("<form name=\"zxcmdform\" method=\"get\">");
+				msg.append("<input type=\"text\" name=\"" + CDDIR + "\" value=\"" + cddir + "\" />");
+				msg.append("<input type=\"text\" name=\"" + DOCMD + "\" value=\"" + cmdstr + "\" />");
+				msg.append("<input type=\"submit\" name=\"btn_zxcmd\" value=\"执行CMD\" />  ");
+				msg.append("</form>");
+				for (String rl : r.data) {
+					rlb.append("<p><script type=\"text/html\" style='display:block'>").append(rl.trim())
+							.append("</script>");
 				}
+				return render200(msg.toString() + "执行返回code※" + r.code + "<p>" + rlb.toString() + "</body></html>");
 			} catch (Exception e) {
 				e.printStackTrace();
 				return doshowFile(session);
